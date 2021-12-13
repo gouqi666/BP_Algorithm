@@ -1,5 +1,5 @@
 import numpy as np
-from MODEL import MLP,Optimizer,Cross_Entropy
+from model import MLP,Optimizer,Cross_Entropy
 from dataset import Dataset,DataLoader
 import random
 def fix_seed(seed = 43):
