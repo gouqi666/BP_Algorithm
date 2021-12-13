@@ -21,10 +21,10 @@ ans = []
 ## x -> (batch_size,input_size)
 ## y -> (batch_size,)
 step = 0
+dataloader = DataLoader(dataset, batch_size=16)
 for epoch in range(epochs):
     total_loss = []
     total_acc = []
-    dataloader = DataLoader(dataset, batch_size=16)
     for data,label in dataloader:
         data =  data / 255
         logits = model.forward(data)

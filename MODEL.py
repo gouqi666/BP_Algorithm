@@ -62,10 +62,16 @@ class Cross_Entropy:
         return grad
 
 class MLP:
+    '''
+    如果改模型结构需要改三个地方
+    1.self.layers，这是要更新的层数，激活函数不用更新可以不包括
+    2.self.prior,模型的运行顺序（包括激活函数）
+    3.self.outputs,从最开始的输入x起到最终输出的前一个，这里需要记录中间输出以便后面算梯度。
+    '''
     def __init__(self,input_size):
-        self.linear1 = Linear(input_size,1000)
+        self.linear1 = Linear(input_size,100)
         self.relu = RELU()
-        self.linear2 = Linear(1000,100)
+        self.linear2 = Linear(100,100)
         self.linear3 = Linear(100,10)
         ## 记录参数
         self.layers = [self.linear1,self.linear2,self.linear3] #
@@ -78,7 +84,7 @@ class MLP:
         ## 记录运行顺序
         self.prior = [self.linear1,self.relu,self.linear2,self.relu,self.linear3] #
         self.outputs = [x,o1,a1,o2,a2] #
-        return o2
+        return o3
     def backward(self,grad): # 这里假设loss一定是标量，不是标量可以转换成标量是一样的。
         # assert loss
         for layer,o in zip(self.prior[::-1],self.outputs[::-1]):
