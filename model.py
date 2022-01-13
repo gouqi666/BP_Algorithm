@@ -35,7 +35,7 @@ class Scheduler:
     def __init__(self,optimizer,step_size):
         self.optimizer = optimizer
         self.step_size =  step_size
-        self.gamma = 0.8
+        self.gamma = 0.9
         self.current_pos = 1
     def step(self,step):
         if step // self.step_size > self.current_pos:
