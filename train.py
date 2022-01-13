@@ -2,6 +2,8 @@ import numpy as np
 from model import MLP,Optimizer,Cross_Entropy,Scheduler
 from dataset import Dataset,DataLoader
 from matplotlib import pyplot as plt
+from test import Predict
+import argparse
 import random
 def fix_seed(seed = 43):
     random.seed(seed)
@@ -18,18 +20,21 @@ def plot(baseline_loss,other_loss,other_label = 'He initialization'):
     fig.savefig('output/baseline vs ' + other_label + '.png')
 
 class Trainer():
-    def __init__(self,initiliaztion = 'rand',adjust_lr = False):
+    def __init__(self,initiliaztion = 'rand',lr = 3e-3,epochs = 100, adjust_lr = False,is_regular = False,use_weights = False):
         fix_seed()
-        self.model = MLP(784,initilization= initiliaztion)
-        self.learning_rate = 3e-3
+        self.is_regular = is_regular
+        self.dataset = Dataset("./data/train-images.idx3-ubyte","./data/train-labels.idx1-ubyte")
+        self.dataloader = DataLoader(self.dataset, batch_size=32)
+        self.model = MLP(784,initilization= initiliaztion,is_regular = self.is_regular)
+        self.learning_rate = lr
+        self.epochs = epochs
         self.adjust_lr = adjust_lr
         self.optimizer = Optimizer(self.model,learning_rate=self.learning_rate)
-        if adjust_lr:
-            self.learning_rate = 3e-3
-        self.scheduler = Scheduler(optimizer=self.optimizer,step_size=5000)
+        self.scheduler = Scheduler(optimizer=self.optimizer,step_size=10000)
         self.critierion = Cross_Entropy()
-        dataset = Dataset()
-        self.dataloader = DataLoader(dataset, batch_size=32)
+        if use_weights:
+            self.critierion = Cross_Entropy(self.dataset.weights)
+
     def train(self):
         min_loss = float('inf')
         ret = []
@@ -39,7 +44,7 @@ class Trainer():
         critierion = self.critierion
         optimizer = self.optimizer
         scheduler = self.scheduler
-        epochs = 50
+        epochs = self.epochs
         for epoch in range(epochs):
             total_loss = []
             total_acc = []
@@ -60,19 +65,49 @@ class Trainer():
             ret.append(sum(total_loss) / len(total_loss))
             print("epoch:%d,step:%d,loss:%.5f,acc:%.5f" % (epoch,step,sum(total_loss) / len(total_loss), sum(total_acc) / len(total_acc)))
         return ret
-trainer = Trainer()
-baseline_loss = trainer.train()
+    def predict(self):
+        Predict(self.model)
 
-# 1. change the init method
-# he_init_trainer = Trainer(initiliaztion='He init')
-# he_init_loss = he_init_trainer.train()
-# plot(baseline_loss,he_init_loss,other_label='He initilization')
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--lr',type=int,default= 3e-3,help="learning rate, notice: don't be more than 5e-3")
+    parser.add_argument('--epochs',type=int,default=100,help='epochs')
+    args = parser.parse_args()
+    return args
+if __name__  == "__main__":
+    args = get_args()
+    print("baseline  train ")
+    trainer = Trainer(lr=args.lr,epochs=args.epochs)
+    baseline_loss = trainer.train()
 
-
-# 3. change to  dynamic lr
-dynamic_lr_trainer = Trainer(adjust_lr= True)
-dynamic_lr_loss = dynamic_lr_trainer.train()
-plot(baseline_loss,dynamic_lr_loss,other_label='Dynamic leraning rate')
-
-## 4.  正则项
+    print("baseline  test")
+    trainer.predict()
+    # 1. change the init method
+    # print("He init train")
+    # he_init_trainer = Trainer(lr=args.lr,epochs=args.epochs,initiliaztion='He init')
+    # he_init_loss = he_init_trainer.train()
+    # plot(baseline_loss,he_init_loss,other_label='He initilization')
+    # print("He init test")
+    # he_init_trainer.predict()
+    # 2. change to weights cross_entropy
+    # print("weights cross_entropy train")
+    # weights_trainer = Trainer(lr=args.lr,epochs=args.epochs,use_weights=True)
+    # weights_loss = weights_trainer.train()
+    # plot(baseline_loss,weights_loss,other_label='weights cross_entropy')
+    # print("weights cross_entropy test")
+    # weights_trainer.predict()
+    # 3. change to  dynamic lr
+    # print("dynamic lr train")
+    # dynamic_lr_trainer = Trainer(lr=args.lr,epochs=args.epochs,adjust_lr= True)
+    # dynamic_lr_loss = dynamic_lr_trainer.train()
+    # plot(baseline_loss,dynamic_lr_loss,other_label='Dynamic leraning rate')
+    # print("dynamic lr test")
+    # dynamic_lr_trainer.predict()
+    ## 4.  regular term
+    print("regular term train")
+    regular_trainer = Trainer(lr=args.lr,epochs=args.epochs,is_regular= True)
+    regular_loss = regular_trainer.train()
+    plot(baseline_loss,regular_loss,other_label='regular term')
+    print("regular term tst")
+    regular_trainer.predict()
 

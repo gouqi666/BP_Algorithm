@@ -1,22 +1,26 @@
 import numpy as np
-import torch
 def fix_seed(seed = 43):
     np.random.seed(seed)
 class Linear:
-    def __init__(self,input_size,hidden_size,is_regular):
+    def __init__(self,input_size,hidden_size,is_regular=False,regular_lambda = 1e-5):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.is_regular = is_regular
+        self.regular_lambda = regular_lambda
         self.w = np.random.randn(input_size,hidden_size)
         self.b = np.random.randn(hidden_size)
         self.grad_w = np.random.randn(input_size,hidden_size)
         self.grad_b = np.random.randn(hidden_size)
     def forward(self,x):
         y = np.matmul(x,self.w) + self.b
+        if self.is_regular:
+            y += 0.5 * self.regular_lambda * np.sum(np.square(self.w))  # 正则项，lambda/2 * ||w||
         return y
     def backward(self,x,grad): # x是输入，grad是上一层反向传播回来的梯度
         self.grad_w =  np.matmul(x.T,grad)
         self.grad_b  = np.matmul(grad.T,np.ones(len(x)))
+        if self.is_regular:
+            self.grad_w += self.regular_lambda * self.w
         return np.matmul(grad,self.w.T) #  传给上一层的梯度，注意其相对位置不能出错
     def update(self,learning_rate):
         self.w -= self.grad_w * learning_rate
@@ -31,7 +35,7 @@ class Scheduler:
     def __init__(self,optimizer,step_size):
         self.optimizer = optimizer
         self.step_size =  step_size
-        self.gamma = 0.95
+        self.gamma = 0.8
         self.current_pos = 1
     def step(self,step):
         if step // self.step_size > self.current_pos:
@@ -47,8 +51,9 @@ class Optimizer:
             layer.update(self.learning_rate)
 
 class Cross_Entropy:
+    def __init__(self,weigths=[]):
+        self.weights = weigths
     def forward(self,x,y):
-        critierion = torch.nn.CrossEntropyLoss()
 
         # 归一化缩小范围，否则计算softmax的时候要溢出
         assert len(y) == len(x)
@@ -68,14 +73,16 @@ class Cross_Entropy:
         for i,yi in enumerate(y):
             loss += -self.output[i,yi] # 要加负号才是损失函数
         loss = loss / len(x)
-        #  可以用torch的交叉熵做比较，发现结果是几乎一致的。
-        # loss2 = critierion(torch.tensor(x,dtype = torch.float),torch.tensor(y,dtype=torch.long))
         return loss / len(x)
     def backward(self): # cross_entropy(带softmax)关于MLP最终输出的梯度
         tmp = np.zeros_like(self.output)
+        self.output = np.exp(self.output)
         for i,yi in enumerate(self.y): # one-hot
             tmp[i,yi] = 1
-        grad = np.exp(self.output) - tmp  # e(logp(x)) = p(X)
+            if len(self.weights) != 0:
+                tmp[i,yi] = self.weights[yi] # 带权重的交叉熵
+                self.output[i] *= self.weights[yi]
+        grad = self.output - tmp  # e(logp(x)) = p(X)
         return grad
 
 class MLP:
@@ -85,11 +92,11 @@ class MLP:
     2.self.prior,模型的运行顺序（包括激活函数）
     3.self.outputs,从最开始的输入x起到最终输出的前一个，这里需要记录中间输出以便后面算梯度。
     '''
-    def __init__(self,input_size,initilization = 'rand',is_regular = False):
-        self.linear1 = Linear(input_size,100,is_regular)
+    def __init__(self,input_size,initilization = 'rand',is_regular = False,regular_lambda = 1e-5):
+        self.linear1 = Linear(input_size,100,is_regular,regular_lambda)
         self.relu = RELU()
-        self.linear2 = Linear(100,100,is_regular)
-        self.linear3 = Linear(100,10,is_regular)
+        self.linear2 = Linear(100,100,is_regular,regular_lambda)
+        self.linear3 = Linear(100,10,is_regular,regular_lambda)
         ## 记录参数
         self.layers = [self.linear1,self.linear2,self.linear3] #
         if initilization == 'He init':
